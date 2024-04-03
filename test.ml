@@ -1,9 +1,4 @@
-(* Fonction pour convertir une chaîne binaire en caractère *)
-let binary_to_char bin =
-  int_of_string ("0b" ^ bin)
-  |> Char.chr
-
-(* Fonction pour lire l'entête PPM (P6) et retourner les dimensions et la valeur max de couleur *)
+(* ... Autres fonctions ... *)
 let lire_entete ic =
   ignore (input_line ic);  (* Ignore la ligne de type "P6" *)
   let dimensions = input_line ic in
@@ -11,14 +6,19 @@ let lire_entete ic =
   let max_val = input_line ic in  (* Lit la valeur maximale des couleurs *)
   (largeur, hauteur, max_val)
 
-(* Fonction pour lire un bit du dernier bit de l'octet *)
+(* Fonction pour lire le dernier bit de l'octet *)
 let lire_dernier_bit octet =
   string_of_int (octet land 1)
+
+(* Fonction pour convertir une chaîne binaire en caractère *)
+let binary_to_char bin =
+  Char.chr (int_of_string ("0b" ^ bin))
+
 
 (* Fonction pour décoder le message caché dans l'image *)
 let decoder_message chemin_fichier =
   let ic = open_in_bin chemin_fichier in
-  let (_, _, _) = lire_entete ic in  (* Ignore l'entête pour l'instant *)
+  let (_, _, _) = lire_entete ic in  (* Ignore l'entête *)
 
   let rec lire_bits n acc =
     if n = 0 then acc
@@ -28,9 +28,13 @@ let decoder_message chemin_fichier =
       lire_bits (n - 1) (acc ^ bit)
   in
 
-  let longueur_bits = lire_bits 30 "" in
+  (* Lire les 30 bits pour la longueur du message *)
+  let longueur_bits = lire_bits (10 * 3) "" in
   let longueur_message = int_of_string ("0b" ^ longueur_bits) in
-  let message_bits = lire_bits (longueur_message) "" in
+  Printf.printf "Longueur du message: %d bits\n" longueur_message;
+
+  (* Lire les bits du message *)
+  let message_bits = lire_bits longueur_message "" in
 
   close_in ic;
 
