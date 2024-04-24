@@ -54,3 +54,6 @@ let decoder_message chemin_fichier =
 let () =
   let message = decoder_message "output.ppm" in
   Printf.printf "Message décodé : %s\n" message
+
+
+  
