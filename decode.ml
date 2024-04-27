@@ -83,46 +83,38 @@ let deserialize_private_key content =
     d = find_value (List.nth lines 4);
   }
 
-let deserialize_ciphertext s =
+let deserialize_ciphertexts s =
   List.map Z.of_string (String.split_on_char ' ' s)
+
 
 let mod_exp a b n = Z.powm a b n
 
 (* Decryption Function *)
-let decrypt_message ciphertext sk =
-  let decrypted_list = List.map (fun c -> mod_exp c sk.d sk.n) ciphertext in
-  let char_options = List.map (fun m ->
-    if Z.leq m (Z.of_int 255) then
-      Some (Char.chr (Z.to_int m))
-    else
-      None
-  ) decrypted_list in
-  (* Debug: Print decrypted characters to see their order
-  List.iter (fun c -> match c with
-    | Some ch -> print_char ch
-    | None -> ()) char_options;*)
-  print_newline ();
-  char_options
+let decrypt_messages ciphertexts sk =
+  let decrypt_block ciphertext =
+    let decrypted_number = mod_exp ciphertext sk.d sk.n in
+    let rec decode z =
+      if Z.equal z Z.zero then []
+      else
+        let char_code = Z.to_int (Z.(mod) z (Z.of_int 256)) in
+        let prev = Z.div z (Z.of_int 256) in
+        char_code :: decode prev
+    in
+    decode decrypted_number |> List.rev |> List.map Char.chr
+  in
+  List.flatten (List.map decrypt_block ciphertexts)
+
 
 (* Main Function *)
 let main () =
   let message = decoder_message "output.ppm" in
-
-  let ciphertext = deserialize_ciphertext message in
+  let ciphertexts = deserialize_ciphertexts message in
   let private_key_content = read_from_file "private_key.txt" in
   let sk = deserialize_private_key private_key_content in
-  let decrypted_chars = decrypt_message ciphertext sk in
-  let message = decrypted_chars |> List.filter_map Fun.id |> List.rev |> List.to_seq |> String.of_seq in
+  let decrypted_chars = decrypt_messages ciphertexts sk in
+  let final_message = String.of_seq (List.to_seq decrypted_chars) in
   print_endline "Decrypted Message:";
-  print_endline message
+  print_endline final_message
 
-
-
-
-
-
-
-
-
-  
 let () = main ()
+

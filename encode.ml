@@ -93,12 +93,12 @@ let inserer_message chemin_fichier message =
   close_out oc
 
 
-
 type rsa_config = { p_len : int; q_len : int; e_len : int }
 type public_key = { n : Z.t; e : Z.t }
 type private_key = { n : Z.t; p : Z.t; q : Z.t; e : Z.t; d : Z.t }
-type plaintext = { message : Z.t list; types : string }
-type cipertext = { c : Z.t list; types : string }
+type plaintext = { message : Z.t; types : string }
+type cipertext = { c : Z.t; types : string }
+
 
 
 let () = Random.self_init ()
@@ -192,55 +192,42 @@ let plaintext_input () =
   let _ = print_string "Please input plaintext: " in
   let m = read_line () in
   let types = "String" in
-  {
-    message =
-      List.map (fun x -> Z.of_int (Char.code x)) (String.to_seq m |> List.of_seq);
-    types;
-  }
+  let rec encode acc chars = match chars with
+    | [] -> acc
+    | h :: t -> encode (Z.add (Z.mul acc (Z.of_int 256)) (Z.of_int (Char.code h))) t
+  in
+  let encoded = encode Z.zero (List.of_seq (String.to_seq m)) in
+  { message = encoded; types }
+
 
 let plaintext_input_string s =
-  {
-    message =
-      List.map (fun x -> Z.of_int (Char.code x)) (String.to_seq s |> List.of_seq);
-    types = "String";
-  }
+  let rec encode acc chars = match chars with
+    | [] -> acc
+    | h :: t -> encode (Z.add (Z.mul acc (Z.of_int 256)) (Z.of_int (Char.code h))) t
+  in
+  let encoded = encode Z.zero (List.of_seq (String.to_seq s)) in
+  { message = encoded; types = "String" }
+
 
 let plaintext_encrypt pt (pk : public_key) =
-  let rec plaintext_encrypt' m acc =
-    match m with
-    | [] -> acc
-    | h :: t -> plaintext_encrypt' t (Z.powm h pk.e pk.n :: acc)
-  in
-  { c = plaintext_encrypt' pt.message []; types = pt.types }
+  let c = Z.powm pt.message pk.e pk.n in
+  { c = c; types = pt.types }
 
 let cipertext_decrypt ct sk =
-  let rec cipertext_decrypt' c acc =
-    match c with
-    | [] -> acc
-    | c :: c' -> cipertext_decrypt' c' (Z.powm c sk.d sk.n :: acc)
-  in
-  { message = cipertext_decrypt' ct.c []; types = ct.types }
-
-let cipertext_output ct =
-  let _ = print_endline "Cipertext: " in
-  let rec cipertext_output' c acc =
-    match c with
-    | [] -> acc
-    | c :: c' -> cipertext_output' c' (acc ^ Z.to_string c)
-  in
-  let _ = print_string (cipertext_output' ct.c "") in
-  print_endline ""
+  let m = Z.powm ct.c sk.d sk.n in
+  { message = m; types = ct.types }
 
 let plaintext_output pt =
-  let _ = print_endline "Plaintext: " in
-  let rec plaintext_output' m acc =
-    match m with
-    | [] -> acc
-    | m :: m' ->
-        plaintext_output' m' (acc ^ Char.escaped (Char.chr (Z.to_int m)))
+  let rec decode z =
+    if Z.equal z Z.zero then ""
+    else
+      let char_code = Z.to_int (Z.(mod) z (Z.of_int 256)) in
+      let prev = Z.div z (Z.of_int 256) in
+      decode prev ^ Char.escaped (Char.chr char_code)
   in
-  let _ = print_string (plaintext_output' pt.message "") in
-  print_endline ""
+  let decoded_string = decode pt.message in
+  print_endline ("Decrypted Plaintext: " ^ decoded_string)
+
 
 
 (* Helper Functions *)
@@ -254,8 +241,9 @@ let serialize_private_key pk =
     (Z.to_string pk.n) (Z.to_string pk.p) (Z.to_string pk.q)
     (Z.to_string pk.e) (Z.to_string pk.d)
 
-let serialize_ciphertext ct =
-  String.concat " " (List.map Z.to_string ct)
+let serialize_ciphertext c =
+  Z.to_string c
+
 
 (* Main RSA Functions Updated *)
 let private_key_gen_and_save rc filename =
@@ -269,22 +257,28 @@ let private_key_gen_and_save rc filename =
   write_to_file ~filename ~content:serialized_pk;
   pk
 
-(* Function to generate and print encrypted message, and return the serialized ciphertext *)
 let encrypt_and_return_message message rc =
   let pk = private_key_gen_and_save rc "private_key.txt" in
   let public_key = public_key_gen pk in
-  let plaintext = plaintext_input_string message in
-  let ciphertext = plaintext_encrypt plaintext public_key in
-  let serialized_ct = serialize_ciphertext ciphertext.c in
-  print_endline ("Encrypted Text: " ^ serialized_ct);
-  serialized_ct  (* Return the serialized ciphertext *)
+  let block_size = (Z.numbits pk.n) / 8 - 1 in  (* Calculating block size based on the key size *)
+
+  let rec encode_blocks msg acc =
+    if msg = "" then List.rev acc
+    else
+      let block = String.sub msg 0 (min block_size (String.length msg)) in
+      let remaining = String.sub msg (min block_size (String.length msg)) (String.length msg - min block_size (String.length msg)) in
+      let encoded = plaintext_input_string block in
+      let encrypted = plaintext_encrypt encoded public_key in
+      encode_blocks remaining (serialize_ciphertext encrypted.c :: acc)
+  in
+  String.concat " " (encode_blocks message [])
 
 (* Example Usage *)
 let rsa_config = { p_len = 256; q_len = 256; e_len = 32 }
 
 (* Example of usage *)
 let () =
-  let message = "salut les gars" in
+  let message = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum." in
   let rsa_message = encrypt_and_return_message message rsa_config in
   inserer_message "input.ppm" rsa_message
 
