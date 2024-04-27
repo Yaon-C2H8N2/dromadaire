@@ -50,10 +50,79 @@ let decoder_message chemin_fichier =
 
   convertir_message message_bits
 
-(* Exemple d'utilisation *)
-let () =
+(* decrypt.ml *)
+open Z
+
+type private_key = {
+  n : Z.t;
+  p : Z.t;
+  q : Z.t;
+  e : Z.t;
+  d : Z.t
+}
+
+(* Helper Functions *)
+let read_from_file filename =
+  let channel = open_in filename in
+  let content = really_input_string channel (in_channel_length channel) in
+  close_in channel;
+  content
+
+let deserialize_private_key content =
+  let lines = String.split_on_char '\n' content in
+  let find_value s =
+    match String.split_on_char '=' s with
+    | [_; value] -> Z.of_string value
+    | _ -> failwith "Invalid private key format"
+  in
+  {
+    n = find_value (List.nth lines 0);
+    p = find_value (List.nth lines 1);
+    q = find_value (List.nth lines 2);
+    e = find_value (List.nth lines 3);
+    d = find_value (List.nth lines 4);
+  }
+
+let deserialize_ciphertext s =
+  List.map Z.of_string (String.split_on_char ' ' s)
+
+let mod_exp a b n = Z.powm a b n
+
+(* Decryption Function *)
+let decrypt_message ciphertext sk =
+  let decrypted_list = List.map (fun c -> mod_exp c sk.d sk.n) ciphertext in
+  let char_options = List.map (fun m ->
+    if Z.leq m (Z.of_int 255) then
+      Some (Char.chr (Z.to_int m))
+    else
+      None
+  ) decrypted_list in
+  (* Debug: Print decrypted characters to see their order
+  List.iter (fun c -> match c with
+    | Some ch -> print_char ch
+    | None -> ()) char_options;*)
+  print_newline ();
+  char_options
+
+(* Main Function *)
+let main () =
   let message = decoder_message "output.ppm" in
-  Printf.printf "Message décodé : %s\n" message
+
+  let ciphertext = deserialize_ciphertext message in
+  let private_key_content = read_from_file "private_key.txt" in
+  let sk = deserialize_private_key private_key_content in
+  let decrypted_chars = decrypt_message ciphertext sk in
+  let message = decrypted_chars |> List.filter_map Fun.id |> List.rev |> List.to_seq |> String.of_seq in
+  print_endline "Decrypted Message:";
+  print_endline message
+
+
+
+
+
+
+
 
 
   
+let () = main ()

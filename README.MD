@@ -1,9 +1,5 @@
 ### Run
-`ocamlc -o encode encode.ml && ./encode`
+`ocamlfind ocamlc -o encode -linkpkg -package zarith encode.ml`
 
-`ocamlc -o decode decode.ml && ./decode`
+`ocamlfind ocamlc -o decode -linkpkg -package zarith decode.ml`
 
-```
-openssl genpkey -algorithm RSA -out private_key.pem -pkeyopt rsa_keygen_bits:2048
-openssl rsa -pubout -in private_key.pem -out public_key.pem
-```
