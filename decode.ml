@@ -86,7 +86,6 @@ let deserialize_private_key content =
 let deserialize_ciphertexts s =
   List.map Z.of_string (String.split_on_char ' ' s)
 
-
 let mod_exp a b n = Z.powm a b n
 
 (* Decryption Function *)
@@ -117,4 +116,3 @@ let main () =
   print_endline final_message
 
 let () = main ()
-

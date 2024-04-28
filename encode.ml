@@ -58,11 +58,6 @@ let ecraser_dernier_bit octet bit_message =
   | _ -> failwith "Le bit de message doit être '0' ou '1'"
 
 
-(* Fonction pour convertir un entier en chaîne binaire de longueur fixe *)
-let int_to_fixed_length_binary_string n length =
-  let binary = int_to_binary_string n in
-  String.make (length - String.length binary) '0' ^ binary
-
 let inserer_message chemin_fichier message =
   let ic = open_in_bin chemin_fichier in
   let oc = open_out_bin "output.ppm" in
@@ -103,7 +98,7 @@ type cipertext = { c : Z.t; types : string }
 
 let () = Random.self_init ()
 (* Helper Fuction *)
-(* check gcd = 1 *)
+
 let coprime a b = Z.gcd a b = Z.one
 
 let rec prime_phi plist =
@@ -179,26 +174,6 @@ let private_key_gen rc =
 
 let public_key_gen pk = { n = pk.n; e = pk.e }
 
-let config_input () =
-  let _ = print_string "Please input p_len: " in
-  let p_len = read_int () in
-  let _ = print_string "Please input q_len: " in
-  let q_len = read_int () in
-  let _ = print_string "Please input e_len: " in
-  let e_len = read_int () in
-  { p_len; q_len; e_len }
-
-let plaintext_input () =
-  let _ = print_string "Please input plaintext: " in
-  let m = read_line () in
-  let types = "String" in
-  let rec encode acc chars = match chars with
-    | [] -> acc
-    | h :: t -> encode (Z.add (Z.mul acc (Z.of_int 256)) (Z.of_int (Char.code h))) t
-  in
-  let encoded = encode Z.zero (List.of_seq (String.to_seq m)) in
-  { message = encoded; types }
-
 
 let plaintext_input_string s =
   let rec encode acc chars = match chars with
@@ -213,20 +188,6 @@ let plaintext_encrypt pt (pk : public_key) =
   let c = Z.powm pt.message pk.e pk.n in
   { c = c; types = pt.types }
 
-let cipertext_decrypt ct sk =
-  let m = Z.powm ct.c sk.d sk.n in
-  { message = m; types = ct.types }
-
-let plaintext_output pt =
-  let rec decode z =
-    if Z.equal z Z.zero then ""
-    else
-      let char_code = Z.to_int (Z.(mod) z (Z.of_int 256)) in
-      let prev = Z.div z (Z.of_int 256) in
-      decode prev ^ Char.escaped (Char.chr char_code)
-  in
-  let decoded_string = decode pt.message in
-  print_endline ("Decrypted Plaintext: " ^ decoded_string)
 
 
 
@@ -243,7 +204,6 @@ let serialize_private_key pk =
 
 let serialize_ciphertext c =
   Z.to_string c
-
 
 (* Main RSA Functions Updated *)
 let private_key_gen_and_save rc filename =
@@ -273,13 +233,9 @@ let encrypt_and_return_message message rc =
   in
   String.concat " " (encode_blocks message [])
 
-(* Example Usage *)
 let rsa_config = { p_len = 256; q_len = 256; e_len = 32 }
 
-(* Example of usage *)
 let () =
   let message = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum." in
   let rsa_message = encrypt_and_return_message message rsa_config in
   inserer_message "input.ppm" rsa_message
-
-
